@@ -1,7 +1,7 @@
-FROM ubuntu:24.04 AS jetpack6
+FROM ubuntu:20.04 AS jetpack6
 
-ARG L4T_RELEASE_MAJOR=36.4
-ARG L4T_RELEASE_MINOR=4
+ARG L4T_RELEASE_MAJOR=36.3
+ARG L4T_RELEASE_MINOR=0
 ARG SOC="t234"
 ARG L4T_RELEASE=$L4T_RELEASE_MAJOR
 
@@ -20,63 +20,46 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gstreamer1.0-plugins-ugly \
     gstreamer1.0-tools \
     i2c-tools \
+    python3-dev \
+    python3-pip \
+    pkg-config \
+    checkinstall \
+    cmake \
+    vim \
     iw \
     kbd \
     kmod \
-    language-pack-en-base \
-    libcanberra-gtk3-module \
-    libdrm-dev \
-    libgles2 \
-    libglvnd-dev \
-    libgtk-3-0 \
-    libudev1 \
-    libvulkan1 \
-    libzmq5 \
-    mtd-utils \
-    parted \
-    pciutils \
     python3 \
     python3-pexpect \
     python3-numpy \
-    sox \
-    udev \
-    vulkan-tools \
     wget \
     curl \
     unzip \
-    wireless-tools wpasupplicant \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 
 
-RUN wget -P /etc/apt/trusted.gpg.d https://repo.download.nvidia.com/jetson/jetson-ota-public.asc
-RUN wget -P /etc/apt/preferences.d https://repo.download.nvidia.com/jetson/nvidia-repo-pin-600
-RUN echo "deb https://repo.download.nvidia.com/jetson/common r${L4T_RELEASE_MAJOR} main" > /etc/apt/sources.list.d/nvidia-l4t-apt-source.list && \
+RUN wget -P /etc/apt/trusted.gpg.d https://repo.download.nvidia.com/jetson/jetson-ota-public.asc && \
+    wget -P /etc/apt/preferences.d https://repo.download.nvidia.com/jetson/nvidia-repo-pin-600 && \
+    echo "deb https://repo.download.nvidia.com/jetson/common r${L4T_RELEASE_MAJOR} main" > /etc/apt/sources.list.d/nvidia-l4t-apt-source.list && \
     echo "deb https://repo.download.nvidia.com/jetson/t234 r${L4T_RELEASE_MAJOR} main" >> /etc/apt/sources.list.d/nvidia-l4t-apt-source.list
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    cuda-toolkit-12-6 cuda-libraries-12-6 \
-    && rm -rf /var/lib/apt/lists/* \
-    && apt-get clean
-RUN apt-get update && apt-get download cuda-compat-12-6 \
-    && dpkg-deb -R ./cuda-compat-12-6_*_arm64.deb ./cuda-compat \
-    && cp -r ./cuda-compat/usr/local/* /usr/local/ \
-    && rm -rf ./cuda-compat-12-6_*_arm64.deb ./cuda-compat
-#
-# Install nvidia-cudnn-dev for CuDNN developer packages
-# Use nvidia-cudnn if need CuDNN runtime only
-#
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    nvidia-cudnn-dev \
-    && rm -rf /var/lib/apt/lists/* \
-    && apt-get clean
-
-
-RUN apt-get update && apt-get download nvidia-l4t-gstreamer \
-    && dpkg-deb -R ./nvidia-l4t-gstreamer_*_arm64.deb ./gstreamer \
-    && cp -r ./gstreamer/usr/bin/* /usr/bin/ \
-    && cp -r ./gstreamer/usr/lib/* /usr/lib/ \
-    && rm -rf ./nvidia-l4t-gstreamer_*_arm64.deb ./gstreamer
+    cuda-toolkit-12-2 \
+    cuda-libraries-12-2 \
+    libcudnn8 \
+    libcudnn8-dev && \
+    apt-get download cuda-compat-12-2 && \
+    dpkg-deb -R ./cuda-compat-12-2_*_arm64.deb ./cuda-compat && \
+    cp -r ./cuda-compat/usr/local/* /usr/local/ && \
+    rm -rf ./cuda-compat-12-2_*_arm64.deb ./cuda-compat && \
+    apt-get download nvidia-l4t-gstreamer && \
+    dpkg-deb -R ./nvidia-l4t-gstreamer_*_arm64.deb ./gstreamer && \
+    cp -r ./gstreamer/usr/bin/* /usr/bin/ && \
+    cp -r ./gstreamer/usr/lib/* /usr/lib/ && \
+    rm -rf ./nvidia-l4t-gstreamer_*_arm64.deb ./gstreamer && \
+    rm -rf /var/lib/apt/lists/* && \
+    apt-get clean
 RUN ldconfig
 
 ENV CUDA_HOME="/usr/local/cuda"
@@ -109,10 +92,6 @@ RUN rm /etc/apt/trusted.gpg.d/jetson-ota-public.asc
 
 
 ARG OPENCV_VERSION=4.10.0
-RUN apt update && \
-    apt install -y --no-install-recommends checkinstall && \
-    apt clean && rm -rf /var/lib/apt/lists/*
-
 RUN curl -L https://github.com/opencv/opencv/archive/${OPENCV_VERSION}.zip -o opencv-${OPENCV_VERSION}.zip && \
     curl -L https://github.com/opencv/opencv_contrib/archive/${OPENCV_VERSION}.zip -o opencv_contrib-${OPENCV_VERSION}.zip && \
     unzip opencv-${OPENCV_VERSION}.zip && \
@@ -122,7 +101,7 @@ RUN curl -L https://github.com/opencv/opencv/archive/${OPENCV_VERSION}.zip -o op
 RUN cmake -B build -S /opencv-${OPENCV_VERSION} \
     -D WITH_CUDA=ON \
     -D WITH_CUDNN=ON \
-    -D CUDA_ARCH_BIN="8.7" \
+    -D CUDA_ARCH_BIN="7.2" \
     -D CUDA_ARCH_PTX="" \
     -D OPENCV_GENERATE_PKGCONFIG=ON \
     -D OPENCV_EXTRA_MODULES_PATH=/opencv_contrib-${OPENCV_VERSION}/modules \
@@ -133,6 +112,7 @@ RUN cmake -B build -S /opencv-${OPENCV_VERSION} \
     -D BUILD_PERF_TESTS=OFF \
     -D BUILD_EXAMPLES=OFF \
     -D CMAKE_BUILD_TYPE=RELEASE \
+    -D CMAKE_INSTALL_PREFIX=/usr/local \
     -D PYTHON_DEFAULT_EXECUTABLE=/usr/bin/python3 && \
     cd build && make install -j $(nproc) && \
     checkinstall -y --install=no --pkgname=opencv --pkgversion=${OPENCV_VERSION} --pkgrelease=1 --arch=$BUILDPLATFORM
