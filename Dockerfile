@@ -115,4 +115,6 @@ RUN cmake -B build -S /opencv-${OPENCV_VERSION} \
     -D CMAKE_INSTALL_PREFIX=/usr/local \
     -D PYTHON_DEFAULT_EXECUTABLE=/usr/bin/python3 && \
     cd build && make install -j $(nproc) && \
-    checkinstall -y --install=no --pkgname=opencv --pkgversion=${OPENCV_VERSION} --pkgrelease=1 --arch=$BUILDPLATFORM
+    checkinstall -y --install=no --pkgname=opencv --pkgversion=${OPENCV_VERSION} --pkgrelease=1 --arch=$BUILDPLATFORM && \
+    mkdir -p /output && \
+    cp /build/opencv_*.deb /output/
